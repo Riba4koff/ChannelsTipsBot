@@ -1,5 +1,10 @@
 import telebot
-from Channel import Channel
+import sqlite3
+import Topics
+
+from list_of_channels.WB_OZON import list_channels_of_wb_and_ozon
+from models.Topic import Topic
+from models.Channel import Channel
 from telebot import types
 
 # Токен вашего бота
@@ -9,8 +14,13 @@ bot = telebot.TeleBot(bot_token)
 # Состояния разговора
 CHOOSING, CONFIRM = range(2)
 
-# Контекст разговора
-user_data = {}
+BACK_BUTTON_NAME = "Назад"
+CATEGORIES_BUTTON_NAME = "Категории"
+FEED_BACK_BUTTON_NAME = "Обратная связь"
+
+back_button = types.KeyboardButton(BACK_BUTTON_NAME)
+categories_button = types.KeyboardButton(CATEGORIES_BUTTON_NAME)
+feedback_button = types.KeyboardButton(FEED_BACK_BUTTON_NAME)
 
 
 # Функция начала
@@ -18,24 +28,74 @@ user_data = {}
 def start(message):
     bot.send_message(
         chat_id=message.chat.id,
-        text="Привет! Добро пожаловать в бота по подбору полезных каналов!"
-             " Я здесь, чтобы помочь тебе найти интересные и полезные контенты. Давай начнем!")
-    choose_topic(message)
+        text=f"Привет! 👋\nДобро пожаловать в бота по подбору полезных каналов!"
+             "\nЯ здесь, чтобы помочь тебе найти интересные и полезные контенты.")
+
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(categories_button, feedback_button)
+
+    bot.send_message(
+        chat_id=message.chat.id,
+        reply_markup=markup,
+        text="Давай начнём!"
+    )
+
+    # Ждем пока пользователь нажмет на кнопку
+    bot.register_next_step_handler(message, menu)
+
+
+def menu(message):
+    chosen_menu = message.text
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
+    if chosen_menu == CATEGORIES_BUTTON_NAME:
+        choose_topic(message)
+    if chosen_menu == FEED_BACK_BUTTON_NAME:
+        feedback(message)
+    if chosen_menu == BACK_BUTTON_NAME:
+        markup.add(categories_button, feedback_button)
+
+        bot.send_message(
+            chat_id=message.chat.id,
+            text="Выберите пункт меню",
+            reply_markup=markup
+        )
+
+        bot.register_next_step_handler(message, menu)
+
+
+def feedback(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
+    markup.add(back_button)
+
+    bot.send_message(
+        chat_id=message.chat.id,
+        text="Если у вас возникли проблемы или вы обнаружили ошибку, не стесняйтесь связаться с нашей службой "
+             "поддержки. Мы готовы помочь вам в любое время.\n"
+             "\n📧 Электронная почта: channelstipsbot@gmail.com"
+             "\n\nОпишите ваш запрос или проблему как можно более подробно, прикрепите скриншоты, если необходимо."
+             " Наша команда поддержки постарается оперативно решить ваш вопрос. Благодарим за обратную связь и "
+             "сотрудничество!",
+        reply_markup=markup
+    )
+
+    bot.register_next_step_handler(message, menu)
 
 
 # Функция выбора темы
 def choose_topic(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    topics = ["WB & OZON"]
 
-    for topic in topics:
-        markup.add(types.KeyboardButton(topic))
+    markup.add(Topics.wildberries_and_ozon_button, back_button)
 
     bot.send_message(
         chat_id=message.chat.id,
-        text= "Выбери тему, которая тебя интересует.",
+        text="Выбери тему, которая тебя интересует.",
         reply_markup=markup
     )
+
+    # Ждем пока пользователь нажмет на кнопку
     bot.register_next_step_handler(message, choose_recommendations)
 
 
@@ -45,37 +105,16 @@ def choose_recommendations(message):
 
     # Пример фиктивных данных с рекомендациями для каждой темы
     recommendations = {
-        "WB & OZON": [
-            Channel(
-                name="Point Free",
-                link="t.me/+ckAY2Km-Rl43ZTgy",
-                description="Канал со Сливом лучших промокодов, купонов, скидок и акций."
-            ),
-            Channel(
-                name="WB Sniper | Находки с Wildberries | Скидки | Акции",
-                link="https://t.me/+H5PdPxdDJvVkZjk6",
-                description="Твой личный эксперт лучших предложений на WB 🛍\n— Скидки Wildberries\n— Обзоры товаров "
-                            "WB\n— Полезные, интересные товары каждый день\n— Вайлберис / вайлдберис"
-            ),
-            Channel(
-                name="Дьявол носит Wildberries",
-                link="https://t.me/+ijuhqpFrdF4yMjBi"
-            ),
-            Channel(
-                name="Находки Скидки WB | ВБ",
-                link="t.me/+KWV4nqea8LBkYTMy",
-                description="По всем вопросам - @P4H3R\n"
-                            "Если он👆спит - @mirman_smm\n"
-                            "Админ - @Bikoobraz\n"
-                            "Менеджер - @zakaz_tb, @veron1ka1606\n"
-            )
-        ]
+        Topics.wildberries_and_ozon_title: list_channels_of_wb_and_ozon
     }
 
     # Получаем рекомендации для выбранной темы
     recommended_channels = recommendations.get(chosen_topic, [])
 
     # Если нет рекомендаций для выбранной темы, отправляем сообщение
+    if chosen_topic == BACK_BUTTON_NAME:
+        menu(message)
+        return
     if not recommended_channels:
         bot.send_message(
             chat_id=message.chat.id,
@@ -94,9 +133,12 @@ def choose_recommendations(message):
         description = f"\n*{channel.description}\n\n*" if channel.description else ""
         bot.send_message(
             chat_id=message.chat.id,
-            text= f"{description}[{channel.name}]({channel.link})",
+            text=f"{description}[{channel.name}]({channel.link})",
             parse_mode="Markdown"
         )
+
+    # Ждем пока пользователь нажмет на кнопку
+    bot.register_next_step_handler(message, choose_recommendations)
 
 
 # Запуск бота
