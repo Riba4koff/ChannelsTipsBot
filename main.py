@@ -1,23 +1,19 @@
 import telebot
-import sqlite3
 import Topics
 
-from list_of_channels.WB_OZON import list_channels_of_wb_and_ozon
-from models.Topic import Topic
-from models.Channel import Channel
+from Channels import list_channels_of_wb_and_ozon
 from telebot import types
 
 # Токен вашего бота
 bot_token = '6868528320:AAF4qyq9sPtcrlDoYJe_Oxdd-IimFwlGluQ'
 bot = telebot.TeleBot(bot_token)
 
-# Состояния разговора
-CHOOSING, CONFIRM = range(2)
-
-BACK_BUTTON_NAME = "Назад"
+# Названия основных кнопок
+BACK_BUTTON_NAME = "Назад 🔙"
 CATEGORIES_BUTTON_NAME = "Категории"
-FEED_BACK_BUTTON_NAME = "Обратная связь"
+FEED_BACK_BUTTON_NAME = "Обратная связь 🆘"
 
+# Основные кнопки
 back_button = types.KeyboardButton(BACK_BUTTON_NAME)
 categories_button = types.KeyboardButton(CATEGORIES_BUTTON_NAME)
 feedback_button = types.KeyboardButton(FEED_BACK_BUTTON_NAME)
@@ -45,7 +41,11 @@ def start(message):
 
 
 def menu(message):
+    """
+    Функция основного меню
+    """
     chosen_menu = message.text
+
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
     if chosen_menu == CATEGORIES_BUTTON_NAME:
@@ -64,7 +64,11 @@ def menu(message):
         bot.register_next_step_handler(message, menu)
 
 
+# Функция обратной связи
 def feedback(message):
+    """
+    Функция для обратной связи с пользователями
+    """
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
     markup.add(back_button)
@@ -85,9 +89,17 @@ def feedback(message):
 
 # Функция выбора темы
 def choose_topic(message):
+    """
+    Функция выбора тем каналов
+    """
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
-    markup.add(Topics.wildberries_and_ozon_button, back_button)
+    markup.add(
+        Topics.wildberries_and_ozon_button,
+        Topics.movies_button,
+        Topics.news_title,
+        back_button,
+    )
 
     bot.send_message(
         chat_id=message.chat.id,
@@ -101,6 +113,9 @@ def choose_topic(message):
 
 # Функция рекомендаций каналов
 def choose_recommendations(message):
+    """
+    Функция вывода каналов по выбранной пользователем теме
+    """
     chosen_topic = message.text  # Приводим выбранную тему к нижнему регистру для удобства сравнения
 
     # Пример фиктивных данных с рекомендациями для каждой темы
